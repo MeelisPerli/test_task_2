@@ -23,10 +23,11 @@ def get_cve(cve_id):
             last_modified_at,
             source_identifier,
             vuln_status
-        FROM cves
+        FROM cve.cves
         WHERE id = %s
         """, (cve_id,))
         row = cur.fetchone()
+
     except Exception as e:
         return jsonify({'error': str(e)})
     finally:

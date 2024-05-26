@@ -1,5 +1,5 @@
 from flask import Blueprint
-
+from flask import request
 from db_utils import get_conn
 
 
@@ -93,13 +93,16 @@ def highest_impact():
     This function returns the top 10 CVEs with the highest impact score
     :return: JSON
     """
+    min_published_at = request.args.get('min_published_at', '1970-01-01')
+    max_published_at = request.args.get('max_published_at', '9999-12-31')
+
     conn = get_conn()
     cur = conn.cursor()
     try:
         cur.execute("""
-                WITH 
+                WITH
                 filtered_cves AS (
-                    SELECT 
+                    SELECT
                         i.cve_id,
                         i.impact_score,
                         d.value AS description,
@@ -107,12 +110,11 @@ def highest_impact():
                     FROM cve.cves AS c
                     LEFT JOIN cve.cve_impact AS i ON c.id = i.cve_id
                     LEFT JOIN cve.cve_description AS d ON c.id = d.cve_id
-                    --  Making sure that we only use data as of 05-01-2024
-                    WHERE c.published_at < '2024-05-01' AND d.lang = 'en'
+                    WHERE c.published_at BETWEEN %s AND %s AND d.lang = 'en' and c.published_at < '2024-05-01'
                 ),
 
                 final AS (
-                    SELECT 
+                    SELECT
                         cve_id,
                         description,
                         impact_score
@@ -123,7 +125,7 @@ def highest_impact():
                 )
                 SELECT * FROM final
                 ;
-                """)
+                """, (min_published_at, max_published_at))
         rows = cur.fetchall()
 
     except Exception as e:
@@ -143,13 +145,16 @@ def highest_exploitability():
     This function returns the top 10 CVEs with the highest exploitability score
     :return: JSON
     """
+    min_published_at = request.args.get('min_published_at', '1970-01-01')
+    max_published_at = request.args.get('max_published_at', '9999-12-31')
+
     conn = get_conn()
     cur = conn.cursor()
     try:
         cur.execute("""
-                WITH 
+                WITH
                 filtered_cves AS (
-                    SELECT 
+                    SELECT
                         i.cve_id,
                         i.exploitability_score,
                         d.value AS description,
@@ -157,12 +162,11 @@ def highest_exploitability():
                     FROM cve.cves AS c
                     LEFT JOIN cve.cve_impact AS i ON c.id = i.cve_id
                     LEFT JOIN cve.cve_description AS d ON c.id = d.cve_id
-                    --  Making sure that we only use data as of 05-01-2024
-                    WHERE c.published_at < '2024-05-01' AND d.lang = 'en'
+                    WHERE c.published_at BETWEEN %s AND %s AND d.lang = 'en' and c.published_at < '2024-05-01'
                 ),
 
                 final AS (
-                    SELECT 
+                    SELECT
                         cve_id,
                         description,
                         exploitability_score
@@ -173,7 +177,7 @@ def highest_exploitability():
                 )
                 SELECT * FROM final
                 ;
-                """)
+                """, (min_published_at, max_published_at))
         rows = cur.fetchall()
 
     except Exception as e:
@@ -190,7 +194,7 @@ def highest_exploitability():
 @analytical_questions_bp.route('/top_attack_vectors')
 def top_attack_vectors():
     """
-    This function returns the top 10 attack vectors
+    This function returns the top attack vectors
     :return: JSON
     """
     conn = get_conn()
@@ -205,17 +209,17 @@ def top_attack_vectors():
                     FROM cve.cves AS c
                     LEFT JOIN cve.cve_impact AS i ON c.id = i.cve_id
                     --  Making sure that we only use data as of 05-01-2024
-                    WHERE c.published_at < '2024-05-01'
+                    WHERE c.published_at < '2024-05-01' and i.access_vector is not null
                 ),
 
                 final AS (
                     SELECT 
                         access_vector,
                         count(*) AS count
-                    FROM filtered
+                    FROM filtered_cves
                     WHERE flag_latest_version
                     GROUP BY access_vector
-                    ORDER BY exploitability_score desc
+                    ORDER BY count DESC
                     LIMIT 10
                 )
                 SELECT * FROM final
